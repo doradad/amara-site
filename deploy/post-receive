@@ -1,0 +1,13 @@
+#!/bin/bash
+# 服务器 bare 仓库钩子：push 到 main 后自动检出到网站目录并重载 Nginx
+set -e
+WORK_TREE=/var/www/amara
+GIT_DIR=/srv/git/amara.git
+while read oldrev newrev ref; do
+  [ "$ref" = "refs/heads/main" ] || continue
+  git --work-tree="$WORK_TREE" --git-dir="$GIT_DIR" checkout -f main
+  echo ">>> 已部署 $(git --git-dir="$GIT_DIR" log -1 --format='%h %s' main) 到 $WORK_TREE"
+  if [ -f "$WORK_TREE/deploy/nginx/amara.conf" ] && ! cmp -s "$WORK_TREE/deploy/nginx/amara.conf" /etc/nginx/conf.d/amara.conf; then
+    echo ">>> Nginx 配置有变化，请在服务器执行：sudo cp $WORK_TREE/deploy/nginx/amara.conf /etc/nginx/conf.d/ && sudo nginx -t && sudo systemctl reload nginx"
+  fi
+done

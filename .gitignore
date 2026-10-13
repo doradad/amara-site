@@ -1,0 +1,6 @@
+.DS_Store
+__pycache__/
+deploy/logs/
+*.log
+site.bak/
+site.new/

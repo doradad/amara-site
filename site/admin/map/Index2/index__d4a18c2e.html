@@ -1,0 +1,278 @@
+
+<div id="allmap" style="height: 100%; width: 100%;"></div>
+
+
+<script type="text/javascript">
+    window._AMapSecurityConfig = {
+        serviceHost: 'https://baas-api.wanwang.xin/toc/amap/proxy/54141951/_AMapService'
+    };
+    window.onAmapReady = function (result) {
+        if (typeof AMap === 'undefined') {
+            window._amapLoadFailed = true;
+            var msg = result && result.info ? result.info : 'AMap SDK load failed';
+            console.error('[map]', msg, result || '');
+            return;
+        }
+        window._amapLoaded = true;
+        if (typeof window._onAmapReady === 'function') {
+            window._onAmapReady();
+        }
+    };
+</script>
+<script type="text/javascript" src="/_ext/webapi.amap.com/maps__38954531"></script>
+
+
+<script src="/_ext/img.website.xin/Scripts/JQuery/jquery.min__25308180.js" type="text/javascript"></script>
+<script type="text/javascript">
+    // HTML 转义函数，防止 XSS 攻击
+    function escapeHtml(text) {
+        if (!text) return "";
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+    var ShowMapType="on";
+    var ShowNavigation="on";
+    var ShowMarker="on";
+    var MapLanguage = "zh_cn";
+    var MapStyle = "normal"
+    var toolBar;
+    var mapObj;//= new AMap.Map("allmap");
+    // 使用安全的 JSON 序列化，防止 XSS 攻击
+    var marker = [{"ItemTitle":"中国建材大厦","ItemDetail":"中国建材大厦坐落于北京市海淀区三里河路甲11号，毗邻中国住房和城乡建设部、中国建筑工程总公司总部。","ProvinceName":"","CityName":"","Content":"朝阳区望京SOHO","AdressDetail":"北京中建大厦C座","DisplayOrder":1,"MapSelectType":"1","LngLat":"116.333207,39.929346"}];
+
+    function bindMarkerClick(mar, handler) {
+        if (mar && typeof mar.on === 'function') {
+            mar.on('click', handler);
+        } else if (typeof AMap !== 'undefined' && AMap.event && typeof AMap.event.addListener === 'function') {
+            AMap.event.addListener(mar, 'click', handler);
+        }
+    }
+
+    function setMapCenter(lngLat) {
+        if (typeof mapObj.setCenter === 'function') {
+            mapObj.setCenter(lngLat, true);
+        }
+    }
+
+    function init(){
+        mapObj = new AMap.Map("allmap", { resizeEnable: false, zoom: parseInt("15") });
+        if(ShowNavigation=="on"){
+            mapObj.plugin(["AMap.ToolBar"], function () {
+                toolBar = new AMap.ToolBar();
+                mapObj.addControl(toolBar);
+                toolBar.show();
+            });
+        }
+        if(ShowMapType=="on"){
+            mapObj.plugin(["AMap.MapType"],function(){
+                //地图类型切换
+                var mapType= new AMap.MapType({
+                    defaultType:0,//默认显示卫星图
+                    showRoad:true
+                });
+                mapObj.addControl(mapType);
+            });
+        }
+
+        if(MapLanguage !="" && typeof mapObj.setLang === 'function'){
+            mapObj.setLang(MapLanguage);
+        }
+        if(MapStyle !="" && typeof mapObj.setMapStyle === 'function'){
+            mapObj.setMapStyle(MapStyle);
+        }
+        if(marker!=null)
+        {
+            if (marker.length > 0) {
+                for (var i = 0; i < marker.length; i++) {
+                    var markerItem = marker[i];
+                    //新模式:有坐标优先读取坐标的信息
+                    if (markerItem.LngLat && markerItem.LngLat.indexOf(",") !== -1) {
+                        var locationInfo = markerItem.LngLat.split(',');
+                        var lng = locationInfo[0] * 1;
+                        var lat = locationInfo[1] * 1;
+                        addmarkerByLngLat(i, lng, lat, marker[i].DisplayOrder);
+                        if (i === marker.length - 1) {
+                            if (marker.length > 1) {
+                                mapObj.setFitView();
+                            } else {
+                                setMapCenter(new AMap.LngLat(lng, lat));
+                            }
+                        }
+                    }
+                    else {
+                            search(marker[i].AdressDetail, marker[i].CityName, marker[i].DisplayOrder);
+                    }
+                }
+            }
+        }
+    }
+
+    function search(addressname, cityname, addressItemId) {
+        var MSearch;
+        //加载地理编码插件
+        mapObj.plugin(["AMap.PlaceSearch"], function () {
+            MSearch = new AMap.PlaceSearch({ //构造地点查询类
+                pageSize:10,
+                pageIndex:1,
+                city:cityname //城市
+            });
+            //关键字查询
+            MSearch.search(addressname, function (status, result) {
+                if (status === 'complete' && result.info === 'OK') {
+                    keywordSearch_CallBack(result,addressItemId);
+                } else {
+                    geocoder(addressname, cityname,addressItemId);
+                }
+                mapObj.setZoom(parseInt("15"));
+            });
+        });
+    }
+
+    function geocoder(addressname, cityname,addressItemId ) {
+        var MGeocoder;
+        //加载地理编码插件
+        mapObj.plugin(["AMap.Geocoder"], function () {
+            MGeocoder = new AMap.Geocoder({
+                city: cityname, //城市，默认：“全国”
+                radius: 3000
+            });
+            //返回地理编码结果
+            //AMap.event.addListener(MGeocoder, "complete", geocoder_CallBack);
+            //地理编码
+            MGeocoder.getLocation(addressname, function(status, result){
+                if(status === 'complete' && result.info === 'OK'){
+                    geocoder_CallBack(result,addressItemId);
+                }
+            });
+        });
+    }
+    function addmarker(i, d, itemId) {
+        var lngX = d.location.getLng();
+        var latY = d.location.getLat();
+        var markerOption = {
+            map: mapObj,
+            position: new AMap.LngLat(lngX, latY)
+        };
+        var mar = new AMap.Marker(markerOption);
+        //marker.push(new AMap.LngLat(lngX, latY));
+        //构建信息窗体中显示的内容
+        var info = [];
+        for (var i = 0; i < marker.length; i++) {
+            if(marker[i].DisplayOrder==itemId){
+                // 使用 HTML 转义函数防止 XSS 攻击
+                info.push("<div style=\"padding:0px 0px 0px 4px;\"><b style=\"font-size:14px;\">" + escapeHtml(marker[i].ItemTitle || "") + "</b>");
+                info.push("" + escapeHtml(marker[i].ItemDetail || "") + "</div></div>");
+                continue;
+            }
+        }
+        var infoWindow = new AMap.InfoWindow({
+            content: info.join("<br/>")  //使用默认信息窗体框样式，显示信息内容
+        });
+        var fa=function(e){
+            if(ShowMarker=="on"){
+                infoWindow.open(mapObj, mar.getPosition());
+            }
+            setMapCenter(mar.getPosition());
+        };
+        bindMarkerClick(mar, fa) ;
+    }
+    function addmarkerByLngLat(i, lngX,latY, itemId) {
+        var markerOption = {
+            map: mapObj,
+            position: new AMap.LngLat(lngX, latY)
+        };
+        var mar = new AMap.Marker(markerOption);
+        //marker.push(new AMap.LngLat(lngX, latY));
+        //构建信息窗体中显示的内容
+        var info = [];
+        for (var i = 0; i < marker.length; i++) {
+            if (marker[i].DisplayOrder == itemId) {
+                // 使用 HTML 转义函数防止 XSS 攻击
+                info.push("<div style=\"padding:0px 0px 0px 4px;\"><b style=\"font-size:14px;\">" + escapeHtml(marker[i].ItemTitle || "") + "</b>");
+                info.push("" + escapeHtml(marker[i].ItemDetail || "") + "</div></div>");
+                continue;
+            }
+        }
+        var infoWindow = new AMap.InfoWindow({
+            content: info.join("<br/>")  //使用默认信息窗体框样式，显示信息内容
+        });
+        var fa = function (e) {
+            if (ShowMarker == "on") {
+                infoWindow.open(mapObj, mar.getPosition());
+            }
+            setMapCenter(mar.getPosition());
+        };
+        bindMarkerClick(mar, fa);
+    }
+
+    //地理编码返回结果展示
+    function geocoder_CallBack(data,addressItemId) {
+        var resultStr = "";
+        //地理编码结果数组
+        var geocode = new Array();
+        geocode = data.geocodes;
+        if (geocode.length > 0) {
+            addmarker(0, geocode[0],addressItemId);
+        }
+        mapObj.setFitView();
+    }
+    function keywordSearch_CallBack(data,addressItemId) {
+        var poiArr = data.poiList.pois;
+        var resultCount = poiArr.length;
+        if (resultCount > 0) {
+            for (var i = 0; i < resultCount; i++) {
+                addmarker(i, poiArr[i],addressItemId);
+                break; // 只取第一条查询到的记录显示
+            }
+            mapObj.setFitView();
+        }
+    }
+    $(function () {
+        var mapInitState = 'pending';
+        var hack = null;
+        function tryInit() {
+            if (mapInitState !== 'pending' || window._amapLoadFailed || !$("#allmap").is(":visible") || typeof AMap === 'undefined') {
+                return;
+            }
+            try {
+                init();
+                mapInitState = 'done';
+            } catch (e) {
+                mapInitState = 'failed';
+                console.error('[map] init failed:', e);
+            }
+            if (hack) {
+                clearInterval(hack);
+                hack = null;
+            }
+        }
+        window._onAmapReady = tryInit;
+        if (window._amapLoaded) {
+            tryInit();
+        }
+        var retries = 0;
+        hack = setInterval(function () {
+            if (window._amapLoadFailed) {
+                clearInterval(hack);
+                return;
+            }
+            retries++;
+            tryInit();
+            if (mapInitState !== 'pending' || retries >= 10) {
+                clearInterval(hack);
+            }
+        }, 1000);
+    });
+
+</script>
+<style>
+    .amap-layer > img[src^="data:image"] {
+        display: none !important;
+    }
+</style>
