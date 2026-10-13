@@ -1,5 +1,6 @@
 #!/bin/bash
-# 服务器 bare 仓库钩子：push 到 main 后自动检出到网站目录并重载 Nginx
+# 【已废弃】push-to-server 方式的钩子，保留作为参考
+# 现在用 GitHub + git pull 方式部署，不再需要这个钩子
 set -e
 WORK_TREE=/var/www/amara
 GIT_DIR=/srv/git/amara.git
